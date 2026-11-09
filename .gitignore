@@ -1,0 +1,10 @@
+.env
+.streamlit/secrets.toml
+__pycache__/
+*.py[cod]
+data/uploads/*
+data/versions/*
+data/*.sqlite3
+!data/uploads/.gitkeep
+!data/versions/.gitkeep
+.DS_Store
