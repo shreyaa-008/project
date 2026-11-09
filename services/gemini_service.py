@@ -43,3 +43,17 @@ def edit_image(image_bytes,mime_type,instruction):
             if getattr(block,"type",None)=="image" and getattr(block,"data",None):
                 return base64.b64decode(block.data)
     raise RuntimeError("The model did not return image bytes. Verify image-model access and GEMINI_IMAGE_MODEL.")
+
+
+def embed_text(text, task_type="RETRIEVAL_DOCUMENT"):
+    """Create a dense vector for a caption or search query using Gemini Embeddings."""
+    from google.genai import types
+    response = client().models.embed_content(
+        model=os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"),
+        contents=text,
+        config=types.EmbedContentConfig(task_type=task_type, output_dimensionality=768),
+    )
+    embeddings = getattr(response, "embeddings", None) or []
+    if not embeddings or not getattr(embeddings[0], "values", None):
+        raise RuntimeError("Gemini returned an empty text embedding.")
+    return [float(x) for x in embeddings[0].values]

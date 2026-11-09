@@ -5,7 +5,7 @@ A single-user portfolio MVP built with **Python, Streamlit, Gemini APIs, SQLite 
 ## Features
 - Upload JPG, PNG, JPEG and WebP images.
 - Gemini Vision generates searchable factual captions.
-- Search library images by words and concepts in their captions.
+- Search library images semantically using Gemini caption embeddings and cosine similarity.
 - Edit an image using natural-language instructions.
 - Preset prompts: enhance, change background, remove background, change colours, remove object.
 - Keep original images unchanged and store each edit as a separate version.
@@ -17,7 +17,40 @@ Streamlit UI
   ├─ My Library: upload -> local storage -> Gemini caption -> SQLite
   ├─ Search: natural-language-style search over captions
   ├─ AI Studio: original image + instruction -> Gemini image model -> edited file
+  ├─ Semantic Search: Gemini query embedding -> JSON vector index -> cosine similarity ranking
   └─ Version History: SQLite version records + local image files
+
+Caption Embedding Index
+  ├─ Gemini embedding model: gemini-embedding-001
+  ├─ Document vectors: generated from each image caption at upload time
+  ├─ Query vectors: generated for each natural-language search
+  ├─ Retrieval: cosine similarity, highest score first
+  └─ Persistence: data/caption_vectors.json (created automatically)
+```
+
+## Full System Architecture
+
+```mermaid
+flowchart TD
+    U[User] --> UI[Streamlit Dark UI]
+    UI --> UP[Image Upload]
+    UP --> FS[(Local Image Storage)]
+    UP --> CAP[Gemini Vision Captioning]
+    CAP --> DB[(SQLite Image Metadata)]
+    CAP --> EMB[Gemini Embedding API\n gemini-embedding-001]
+    EMB --> IDX[(JSON Caption Vector Index)]
+    U --> Q[Natural-language Search Query]
+    Q --> QE[Gemini Query Embedding]
+    QE --> RET[Cosine Similarity Retrieval]
+    IDX --> RET
+    DB --> RET
+    RET --> UI
+    UI --> EDIT[Gemini Image Editing Model]
+    FS --> EDIT
+    EDIT --> VFS[(Version Image Storage)]
+    EDIT --> VDB[(SQLite Version Records)]
+    VFS --> HIST[Version History UI]
+    VDB --> HIST
 ```
 
 ## Setup (Windows PowerShell)
@@ -42,6 +75,8 @@ Streamlit UI
    streamlit run app.py
    ```
 
+The embedding model can be changed with `GEMINI_EMBEDDING_MODEL`. The default is `gemini-embedding-001`.
+
 ## Demo flow
 1. My Library -> upload a photo -> Add to library.
 2. Wait for Gemini to caption it.
@@ -62,7 +97,8 @@ Edit prompt: include the original image and user instruction, and ask the model 
 
 ## Limitations and future work
 - This MVP is local and single-user; deploy with authentication and cloud storage for multiple users.
-- Search currently uses token overlap against captions rather than a vector embedding index. Add multilingual embeddings and cosine similarity for larger collections.
+- The current JSON vector index is designed for a small single-user project. For larger collections, replace it with FAISS or Chroma and add index migration/rebuild tooling.
+- Embeddings are generated from Gemini captions, not directly from image pixels. Search quality therefore depends on caption quality.
 - Add delete/restore controls, image comparison slider, rate limiting, safety checks, async jobs, and per-user storage.
 - Generated edits can change details outside the requested region; inspect outputs before commercial use.
 
@@ -73,3 +109,7 @@ Submit the ZIP/GitHub link, README, screenshots or a short demo recording, and d
 - Gemini image understanding: https://ai.google.dev/gemini-api/docs/image-understanding
 - Gemini image generation/editing: https://ai.google.dev/gemini-api/docs/image-generation
 - Streamlit: https://docs.streamlit.io/
+
+### Architecture diagram (PNG)
+
+![PixelAI system architecture](docs/architecture.png)

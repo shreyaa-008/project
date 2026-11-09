@@ -1,0 +1,21 @@
+digraph PixelAI {
+  rankdir=LR; bgcolor="#0b1020"; pad="0.3"; nodesep="0.45"; ranksep="0.65";
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=10, color="#7183a8", fontcolor="#f8fafc", fillcolor="#1c2944", margin="0.16,0.10"];
+  edge [color="#9a8bff", penwidth=1.4, arrowsize=0.75];
+  user [label="User", fillcolor="#45367b"];
+  ui [label="Streamlit Dark UI\nLibrary · AI Studio · History", fillcolor="#30275a"];
+  upload [label="Image Upload + Validation"];
+  fs [label="Local Image Storage\ndata/uploads · data/versions", fillcolor="#173d48"];
+  vision [label="Gemini Vision\nCaption generation", fillcolor="#174a58"];
+  db [label="SQLite Metadata DB\nimages · versions", fillcolor="#173d48"];
+  emb [label="Gemini Embeddings API\ngemini-embedding-001", fillcolor="#174a58"];
+  json [label="JSON Vector Index\ncaption_vectors.json", fillcolor="#4b3c22"];
+  query [label="Natural-language\nsearch query"];
+  qemb [label="Query embedding\nRETRIEVAL_QUERY"];
+  cosine [label="Cosine similarity\nranked retrieval", fillcolor="#4b3c22"];
+  edit [label="Gemini Image Editing\nmodel", fillcolor="#174a58"];
+  history [label="Version History UI"];
+  user -> ui; ui -> upload; upload -> fs; upload -> vision; vision -> db; vision -> emb; emb -> json;
+  user -> query; query -> qemb; qemb -> cosine; json -> cosine; db -> cosine; cosine -> ui;
+  ui -> edit; fs -> edit; edit -> fs [label="new version", fontcolor="#dbeafe"]; edit -> db [label="version metadata", fontcolor="#dbeafe"]; db -> history; fs -> history; history -> ui;
+}

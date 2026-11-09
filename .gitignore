@@ -8,3 +8,6 @@ data/*.sqlite3
 !data/uploads/.gitkeep
 !data/versions/.gitkeep
 .DS_Store
+
+data/*.sqlite3
+data/caption_vectors.json

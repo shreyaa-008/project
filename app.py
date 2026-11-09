@@ -4,7 +4,8 @@ import streamlit as st
 from services.db import init_db, add_image, list_images, get_image, add_version, list_versions, update_caption
 from services.storage import save_upload, save_version
 from services.gemini_service import caption_image, edit_image
-from services.search import search_images
+from services.vector_store import upsert as upsert_vector, search as vector_search, get_indexed_ids, index_stats
+from services.gemini_service import embed_text
 
 ROOT = Path(__file__).parent
 st.set_page_config(page_title="PixelAI Studio", page_icon="✨", layout="wide")
@@ -41,17 +42,48 @@ if page == "My Library":
             if has_key():
                 try:
                     path=save_upload(up.getvalue(),up.name)
-                    image_id=add_image(up.name,str(path),"",up.type or "image/jpeg")
+                    image_id=add_image(up.name,str(path),"","image/jpeg")
                     with st.spinner("Gemini is describing your image..."):
-                        cap=caption_image(up.getvalue(),up.type or "image/jpeg")
+                        stored_bytes=Path(path).read_bytes()
+                        cap=caption_image(stored_bytes,"image/jpeg")
                     update_caption(image_id,cap)
-                    st.success("Image uploaded and captioned.")
+                    with st.spinner("Generating searchable caption embedding..."):
+                        vector=embed_text(cap, "RETRIEVAL_DOCUMENT")
+                        upsert_vector(image_id, cap, vector)
+                    st.success("Image uploaded, captioned and added to the vector search index.")
                     st.rerun()
                 except Exception as e: st.error(f"Upload/analysis failed: {e}")
     with c2:
-        q=st.text_input("🔎 Search your images",placeholder="e.g. show me images with a beach")
+        q=st.text_input("🔎 Search your images",placeholder="e.g. a golden sunset over mountains")
         records=list_images()
-        found=search_images(q,records) if q else records
+        stats=index_stats()
+        st.caption(f"Vector index: {stats['count']} / {len(records)} images indexed · {stats['model']}")
+        if st.button("Build / repair search index", help="Generate embeddings for any uploaded images that are not indexed yet."):
+            if has_key():
+                missing=[r for r in records if str(r["id"]) not in get_indexed_ids() and r.get("caption")]
+                if not missing: st.info("All captioned images are already indexed.")
+                else:
+                    progress=st.progress(0)
+                    try:
+                        for n, record in enumerate(missing, start=1):
+                            vec=embed_text(record["caption"], "RETRIEVAL_DOCUMENT")
+                            upsert_vector(record["id"], record["caption"], vec)
+                            progress.progress(n/len(missing))
+                        st.success(f"Indexed {len(missing)} image(s).")
+                        st.rerun()
+                    except Exception as e: st.error(f"Indexing failed: {e}")
+        found=records
+        if q.strip():
+            if has_key():
+                try:
+                    with st.spinner("Understanding your search and finding similar captions..."):
+                        qvec=embed_text(q.strip(), "RETRIEVAL_QUERY")
+                        found=[r for r, score in vector_search(qvec, records)]
+                    if not found: st.info("No close semantic matches. Try a broader description.")
+                except Exception as e:
+                    st.error(f"Semantic search failed: {e}")
+                    found=[]
+            else: found=[]
         st.caption(f"{len(found)} image(s)")
         if not found: st.info("No matching images. Upload an image first.")
         cols=st.columns(3)
@@ -141,7 +173,7 @@ else:
     **MVP features**
     - Upload JPG, PNG and WebP images.
     - Generate searchable image captions using Gemini Vision.
-    - Search image captions using natural-language-style text queries.
+    - Search image captions with Gemini text embeddings and cosine-similarity retrieval (JSON vector index).
     - Edit selected images through natural-language prompts.
     - Preserve originals and browse edit versions.
 
